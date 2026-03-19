@@ -3,81 +3,85 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import folium
+from streamlit.components.v1 import html
 
-st.set_page_config(page_title="Noise Health App", layout="wide")
-
-# ---------------------------
-# UI (한글은 Streamlit에서만 사용)
-# ---------------------------
-st.title("서울시 소음과 스트레스·수면 영향 분석")
-st.markdown("시뮬레이션 기반 분석 앱")
+st.set_page_config(page_title="서울시 소음-건강 영향 분석 시스템", layout="wide")
 
 # ---------------------------
-# 데이터 (컬럼은 영어로 → 깨짐 방지)
+# 제목
 # ---------------------------
-data = {
-    "region": ["Residential", "Commercial", "Traffic"],
+st.title("서울시 소음과 건강 영향 분석 시스템")
+st.markdown("보건환경연구원 정책 시뮬레이션 및 시각화 도구")
+
+# ---------------------------
+# 데이터 (보고서 기반 + 좌표 추가)
+# ---------------------------
+data = pd.DataFrame({
+    "지역": ["주거", "상권", "교통"],
     "noise": [47.3, 56.14, 68.04],
     "stress": [19.1, 23.86, 32.3],
     "psqi": [6.3, 8.23, 11.74],
-    "sleep": [6.62, 5.93, 4.99]
-}
-
-df = pd.DataFrame(data)
-
-# ---------------------------
-# 한글 표시용 매핑
-# ---------------------------
-region_map = {
-    "Residential": "주거",
-    "Commercial": "상권",
-    "Traffic": "교통"
-}
+    "sleep": [6.62, 5.93, 4.99],
+    "lat": [37.654, 37.566, 37.550],
+    "lon": [127.056, 126.978, 126.990]
+})
 
 # ---------------------------
 # 사이드바
 # ---------------------------
-st.sidebar.header("설정")
+st.sidebar.header("분석 설정")
 
-region_kor = st.sidebar.selectbox("지역 선택", list(region_map.values()))
-
-# 선택된 영어 키 찾기
-region_eng = [k for k, v in region_map.items() if v == region_kor][0]
-
+region = st.sidebar.selectbox("지역 선택", data["지역"])
 noise_change = st.sidebar.slider("야간 소음 변화량 (dB)", -10, 10, 0)
 
-# ---------------------------
-# 데이터 선택
-# ---------------------------
-selected = df[df["region"] == region_eng].iloc[0]
+selected = data[data["지역"] == region].iloc[0]
 
 base_noise = selected["noise"]
 new_noise = base_noise + noise_change
 
 # ---------------------------
-# 계산 (보고서 기반 계수)
+# 회귀 기반 계산
 # ---------------------------
 stress = selected["stress"] + (noise_change * 0.48)
 psqi = selected["psqi"] + (noise_change * 0.20)
 sleep = selected["sleep"] - (noise_change * 0.053)
 
 # ---------------------------
-# 결과 출력
+# 결과 KPI
 # ---------------------------
-st.subheader("결과")
+st.subheader("핵심 결과 지표")
 
 col1, col2, col3 = st.columns(3)
 
-col1.metric("스트레스", f"{stress:.2f}")
-col2.metric("PSQI", f"{psqi:.2f}")
+col1.metric("스트레스 점수", f"{stress:.2f}")
+col2.metric("수면 질 (PSQI)", f"{psqi:.2f}")
 col3.metric("수면시간", f"{sleep:.2f} 시간")
 
-st.write(f"야간 소음: {base_noise:.1f} dB → {new_noise:.1f} dB")
+st.info(f"야간 소음 변화: {base_noise:.1f} dB → {new_noise:.1f} dB")
 
 # ---------------------------
-# 그래프 (영어만 사용 → 절대 안 깨짐)
+# 지도 (Folium → 폰트 안전)
 # ---------------------------
-st.subheader("Noise Impact Simulation")
+st.subheader("서울 지역 시각화")
+
+m = folium.Map(location=[37.5665, 126.9780], zoom_start=11)
+
+for _, row in data.iterrows():
+    folium.CircleMarker(
+        location=[row["lat"], row["lon"]],
+        radius=10,
+        popup=f"{row['지역']}<br>소음:{row['noise']} dB",
+        color="blue",
+        fill=True
+    ).add_to(m)
+
+html(m._repr_html_(), height=500)
+
+# ---------------------------
+# 그래프 (영어로 → 깨짐 방지)
+# ---------------------------
+st.subheader("Noise Impact Analysis")
 
 noise_range = np.arange(base_noise - 10, base_noise + 11, 1)
 
@@ -91,18 +95,30 @@ ax.plot(noise_range, sleep_line, label="Sleep Time")
 
 ax.set_xlabel("Night Noise (dB)")
 ax.set_ylabel("Value")
+ax.set_title("Noise vs Health Impact")
 ax.legend()
 
 st.pyplot(fig)
 
 # ---------------------------
-# 정책 메시지
+# 정책 인사이트
 # ---------------------------
-st.subheader("정책 제안")
+st.subheader("정책 시사점")
 
-if region_eng == "Traffic":
-    st.warning("교통지역: 속도 제한, 저소음 포장, 야간 차량 관리 필요")
-elif region_eng == "Commercial":
-    st.info("상권지역: 심야 소음 및 배달 차량 관리 필요")
+if region == "교통":
+    st.warning("교통지역은 속도 제한, 저소음 포장 등 정책 적용 시 효과가 가장 큼")
+elif region == "상권":
+    st.info("상권지역은 심야 소음 관리 정책이 중요")
 else:
-    st.success("주거지역: 생활소음 관리 및 차음 성능 개선 필요")
+    st.success("주거지역은 생활소음 관리와 차음 성능 개선 필요")
+
+# ---------------------------
+# 결론
+# ---------------------------
+st.subheader("결론")
+
+st.write("""
+- 야간 소음은 스트레스 증가와 수면 감소에 직접적인 영향을 미침
+- 교통지역에서 건강 영향이 가장 크게 나타남
+- 소음 저감 정책은 수면 개선 및 스트레스 완화 효과 기대 가능
+""")
