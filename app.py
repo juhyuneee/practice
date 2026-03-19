@@ -1,16 +1,19 @@
-# app.py
-
+# -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+# 한글 폰트 설정 (Windows 기준)
+plt.rcParams['font.family'] = 'Malgun Gothic'
+plt.rcParams['axes.unicode_minus'] = False
+
 st.set_page_config(page_title="서울시 소음-건강 영향 분석", layout="wide")
 
-st.title("📊 서울시 소음과 스트레스·수면 영향 분석")
-st.markdown("간단한 시뮬레이션 기반 분석 앱")
+st.title("서울시 소음과 스트레스·수면 영향 분석")
+st.markdown("시뮬레이션 기반 분석 앱")
 
-# 데이터 (보고서 기반)
+# 데이터
 data = {
     "지역": ["주거", "상권", "교통"],
     "야간소음(dB)": [47.3, 56.14, 68.04],
@@ -22,7 +25,7 @@ data = {
 df = pd.DataFrame(data)
 
 # 사이드바
-st.sidebar.header("⚙️ 설정")
+st.sidebar.header("설정")
 region = st.sidebar.selectbox("지역 선택", df["지역"])
 noise_change = st.sidebar.slider("야간 소음 변화량 (dB)", -10, 10, 0)
 
@@ -31,13 +34,13 @@ selected = df[df["지역"] == region].copy()
 base_noise = selected["야간소음(dB)"].values[0]
 new_noise = base_noise + noise_change
 
-# 회귀 기반 계산
+# 계산
 stress = selected["스트레스"].values[0] + (noise_change * 0.48)
 psqi = selected["PSQI"].values[0] + (noise_change * 0.20)
 sleep = selected["수면시간"].values[0] - (noise_change * 0.053)
 
-# 결과 표시
-st.subheader("📌 결과")
+# 결과
+st.subheader("결과")
 col1, col2, col3 = st.columns(3)
 
 col1.metric("스트레스", f"{stress:.2f}")
@@ -47,7 +50,7 @@ col3.metric("수면시간", f"{sleep:.2f} 시간")
 st.write(f"야간 소음: {base_noise:.1f} dB → {new_noise:.1f} dB")
 
 # 그래프
-st.subheader("📈 소음 변화 영향")
+st.subheader("소음 변화 영향")
 
 noise_range = np.arange(base_noise - 10, base_noise + 11, 1)
 stress_line = selected["스트레스"].values[0] + ((noise_range - base_noise) * 0.48)
@@ -63,8 +66,8 @@ ax.legend()
 
 st.pyplot(fig)
 
-# 정책 메시지
-st.subheader("💡 정책 제안")
+# 정책
+st.subheader("정책 제안")
 
 if region == "교통":
     st.warning("속도 제한, 저소음 포장, 야간 차량 관리 필요")
