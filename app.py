@@ -1,25 +1,18 @@
-from flask import Flask, request, render_template_string
+import streamlit as st
 
-app = Flask(__name__)
+st.title("퍼스널 컬러 진단 (제품 기반)")
 
 # -------------------------
-# 제품 데이터 (확장 가능)
+# 제품 데이터
 # -------------------------
 products = {
-    # 립
-    "롬앤 쥬시 래스팅 틴트 07": {"tone": "warm", "chroma": 3, "category": "lip", "status": "판매중"},
-    "롬앤 쥬시 래스팅 틴트 06": {"tone": "warm", "chroma": 2, "category": "lip", "status": "판매중"},
-    "페리페라 잉크 무드 글로이 틴트 03": {"tone": "cool", "chroma": 2, "category": "lip", "status": "판매중"},
-    "페리페라 잉크 벨벳 17": {"tone": "cool", "chroma": 3, "category": "lip", "status": "판매중"},
-
-    # 블러셔
-    "3CE 누드피치": {"tone": "warm", "chroma": 1, "category": "blusher", "status": "판매중"},
-    "롬앤 베러 댄 치크 피치칩": {"tone": "warm", "chroma": 2, "category": "blusher", "status": "판매중"},
-    "에뛰드 러블리 쿠키 블러셔 핑크": {"tone": "cool", "chroma": 3, "category": "blusher", "status": "판매중"},
-
-    # 섀도우
-    "클리오 프로 아이 팔레트 02": {"tone": "warm", "chroma": 2, "category": "shadow", "status": "판매중"},
-    "롬앤 드라이로즈": {"tone": "cool", "chroma": 1, "category": "shadow", "status": "판매중"},
+    "롬앤 쥬시 래스팅 틴트 07": {"tone": "warm", "chroma": 3, "category": "lip"},
+    "롬앤 쥬시 래스팅 틴트 06": {"tone": "warm", "chroma": 2, "category": "lip"},
+    "페리페라 잉크 무드 글로이 틴트 03": {"tone": "cool", "chroma": 2, "category": "lip"},
+    "페리페라 잉크 벨벳 17": {"tone": "cool", "chroma": 3, "category": "lip"},
+    "3CE 누드피치": {"tone": "warm", "chroma": 1, "category": "blusher"},
+    "롬앤 베러 댄 치크 피치칩": {"tone": "warm", "chroma": 2, "category": "blusher"},
+    "에뛰드 쿠키 블러셔 핑크": {"tone": "cool", "chroma": 3, "category": "blusher"},
 }
 
 # -------------------------
@@ -31,7 +24,7 @@ def analyze(product_list, weight=1):
     count = 0
 
     for p in product_list:
-        if p and p in products:
+        if p in products:
             data = products[p]
             tone_score += (1 if data["tone"] == "warm" else -1) * weight
             chroma_score += data["chroma"] * weight
@@ -50,16 +43,11 @@ def determine_pc(tone, chroma):
         return "겨울 쿨톤" if chroma >= 2 else "여름 쿨톤"
 
 
-# -------------------------
-# 추천 로직
-# -------------------------
-def recommend_set(tone_type):
+def recommend(tone_type):
     lips = []
     blushers = []
 
     for name, data in products.items():
-        if data["status"] != "판매중":
-            continue
         if data["tone"] == tone_type:
             if data["category"] == "lip":
                 lips.append(name)
@@ -72,65 +60,35 @@ def recommend_set(tone_type):
 # -------------------------
 # UI
 # -------------------------
-HTML = """
-<h2>퍼스널 컬러 진단 (제품 기반)</h2>
+product_list = list(products.keys())
 
-<form method="post">
+st.subheader("잘 맞았던 제품")
+good = st.multiselect("3개 선택", product_list)
 
-<h3>잘 맞았던 제품</h3>
-<select name="good1"><option value="">선택</option>{% for p in products %}<option>{{p}}</option>{% endfor %}</select><br>
-<select name="good2"><option value="">선택</option>{% for p in products %}<option>{{p}}</option>{% endfor %}</select><br>
-<select name="good3"><option value="">선택</option>{% for p in products %}<option>{{p}}</option>{% endfor %}</select><br>
+st.subheader("안 맞았던 제품")
+bad = st.multiselect("선택", product_list)
 
-<h3>안 맞았던 제품 (선택)</h3>
-<select name="bad1"><option value="">선택</option>{% for p in products %}<option>{{p}}</option>{% endfor %}</select><br>
+st.subheader("반응 좋았던 제품")
+best = st.multiselect("선택", product_list)
 
-<h3>반응 좋았던 제품 (선택)</h3>
-<select name="best1"><option value="">선택</option>{% for p in products %}<option>{{p}}</option>{% endfor %}</select><br><br>
+if st.button("분석하기"):
 
-<button type="submit">분석하기</button>
-</form>
+    t1, c1 = analyze(good, 1)
+    t2, c2 = analyze(best, 2)
+    t3, c3 = analyze(bad, -1)
 
-{% if result %}
-<hr>
-<h2>🎯 결과: {{ result }}</h2>
+    tone = t1 + t2 + t3
+    chroma = c1 + c2 + c3
 
-<h3>💄 립 추천</h3>
-<ul>{% for l in lips %}<li>{{l}}</li>{% endfor %}</ul>
+    result = determine_pc(tone, chroma)
+    tone_type = "warm" if tone >= 0 else "cool"
 
-<h3>🌸 블러셔 추천 (립과 조합)</h3>
-<ul>{% for b in blushers %}<li>{{b}}</li>{% endfor %}</ul>
-{% endif %}
-"""
+    lips, blushers = recommend(tone_type)
 
-# -------------------------
-# 라우트
-# -------------------------
-@app.route("/", methods=["GET", "POST"])
-def home():
-    result = None
-    lips = []
-    blushers = []
+    st.success(f"🎯 결과: {result}")
 
-    if request.method == "POST":
-        good = [request.form.get("good1"), request.form.get("good2"), request.form.get("good3")]
-        bad = [request.form.get("bad1")]
-        best = [request.form.get("best1")]
+    st.subheader("💄 립 추천")
+    st.write(lips)
 
-        t1, c1 = analyze(good, 1)
-        t2, c2 = analyze(best, 2)
-        t3, c3 = analyze(bad, -1)
-
-        tone = t1 + t2 + t3
-        chroma = c1 + c2 + c3
-
-        result = determine_pc(tone, chroma)
-        tone_type = "warm" if tone >= 0 else "cool"
-
-        lips, blushers = recommend_set(tone_type)
-
-    return render_template_string(HTML, products=products.keys(), result=result, lips=lips, blushers=blushers)
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
+    st.subheader("🌸 블러셔 추천")
+    st.write(blushers)
