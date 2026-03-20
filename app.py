@@ -6,8 +6,6 @@ st.title("💄 퍼스널 컬러 기반 화장품 추천")
 
 # -------------------------
 # 제품 데이터 (국내 구매 가능 / 단종 제외)
-# tone: warm / cool
-# chroma: 1(저채도) ~ 3(고채도)
 # -------------------------
 products = {
     # 립
@@ -29,7 +27,7 @@ products = {
 product_list = list(products.keys())
 
 # -------------------------
-# 분석 함수 (안정성 강화)
+# 분석 함수
 # -------------------------
 def analyze(lst, weight):
     tone_score = 0
@@ -48,14 +46,14 @@ def analyze(lst, weight):
     return tone_score / count, chroma_score / count
 
 
-def get_result(tone, chroma):
+def get_personal_color(tone, chroma):
     if tone >= 0:
         return "봄 웜톤 🌸" if chroma >= 2 else "가을 웜톤 🍂"
     else:
         return "겨울 쿨톤 ❄️" if chroma >= 2 else "여름 쿨톤 🌊"
 
 
-def recommend(tone_type):
+def recommend_products(tone_type):
     lips = []
     blushers = []
 
@@ -81,13 +79,11 @@ bad = st.multiselect("선택", product_list, max_selections=3)
 st.subheader("3️⃣ 반응 좋았던 제품 (선택)")
 best = st.multiselect("선택", product_list, max_selections=3)
 
-# -------------------------
-# 실행 버튼
-# -------------------------
+
 if st.button("🔍 퍼스널 컬러 분석"):
 
     if len(good) == 0:
-        st.warning("👉 최소 1개 이상의 '잘 맞았던 제품'을 선택해주세요")
+        st.warning("👉 최소 1개 이상 선택해주세요")
     else:
         t1, c1 = analyze(good, 1)
         t2, c2 = analyze(best, 2)
@@ -96,15 +92,12 @@ if st.button("🔍 퍼스널 컬러 분석"):
         tone = t1 + t2 + t3
         chroma = c1 + c2 + c3
 
-        result = get_result(tone, chroma)
+        result = get_personal_color(tone, chroma)
         tone_type = "warm" if tone >= 0 else "cool"
 
         st.success(f"🎯 당신의 퍼스널 컬러: {result}")
 
-        # -------------------------
-        # 연계 추천
-        # -------------------------
-        lips, blushers = recommend(tone_type)
+        lips, blushers = recommend_products(tone_type)
 
         st.subheader("💄 추천 립")
         for l in lips:
@@ -114,15 +107,4 @@ if st.button("🔍 퍼스널 컬러 분석"):
         for b in blushers:
             st.write("✔️", b)
 
-        # -------------------------
-        # 추가 설명 (전문성)
-        # -------------------------
-        st.info(
-            f"""
-👉 분석 기준  
-- 따뜻함/차가움 점수: {round(tone,2)}  
-- 채도 점수: {round(chroma,2)}  
-
-👉 선택한 제품들의 색감 패턴을 기반으로 도출된 결과입니다.
-"""
-        )
+        st.info(f"톤 점수: {round(tone,2)} / 채도 점수: {round(chroma,2)}")
