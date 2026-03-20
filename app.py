@@ -1,124 +1,135 @@
 from flask import Flask, request, render_template_string
-import numpy as np
 
 app = Flask(__name__)
 
 # -------------------------
-# 제품 데이터 (국내 구매 가능 + 단종 제외)
+# 제품 데이터 (확장 가능)
 # -------------------------
 products = {
-    "롬앤 쥬시 래스팅 틴트 07": {"tone": "warm", "chroma": "high", "value": "mid", "category": "lip", "status": "판매중"},
-    "페리페라 잉크 무드 글로이 틴트 03": {"tone": "cool", "chroma": "mid", "value": "high", "category": "lip", "status": "판매중"},
-    "3CE 무드 레시피 블러셔 누드피치": {"tone": "warm", "chroma": "low", "value": "mid", "category": "blusher", "status": "판매중"},
-    "롬앤 베러 댄 아이즈 드라이로즈": {"tone": "cool", "chroma": "low", "value": "mid", "category": "shadow", "status": "판매중"},
-    "클리오 프로 아이 팔레트 02": {"tone": "warm", "chroma": "mid", "value": "mid", "category": "shadow", "status": "판매중"},
-    "에뛰드 하트팝 블러셔 핑크": {"tone": "cool", "chroma": "high", "value": "high", "category": "blusher", "status": "판매중"},
+    # 립
+    "롬앤 쥬시 래스팅 틴트 07": {"tone": "warm", "chroma": 3, "category": "lip", "status": "판매중"},
+    "롬앤 쥬시 래스팅 틴트 06": {"tone": "warm", "chroma": 2, "category": "lip", "status": "판매중"},
+    "페리페라 잉크 무드 글로이 틴트 03": {"tone": "cool", "chroma": 2, "category": "lip", "status": "판매중"},
+    "페리페라 잉크 벨벳 17": {"tone": "cool", "chroma": 3, "category": "lip", "status": "판매중"},
+
+    # 블러셔
+    "3CE 누드피치": {"tone": "warm", "chroma": 1, "category": "blusher", "status": "판매중"},
+    "롬앤 베러 댄 치크 피치칩": {"tone": "warm", "chroma": 2, "category": "blusher", "status": "판매중"},
+    "에뛰드 러블리 쿠키 블러셔 핑크": {"tone": "cool", "chroma": 3, "category": "blusher", "status": "판매중"},
+
+    # 섀도우
+    "클리오 프로 아이 팔레트 02": {"tone": "warm", "chroma": 2, "category": "shadow", "status": "판매중"},
+    "롬앤 드라이로즈": {"tone": "cool", "chroma": 1, "category": "shadow", "status": "판매중"},
 }
 
 # -------------------------
-# 점수 변환
+# 분석 함수
 # -------------------------
-tone_map = {"warm": 1, "cool": -1}
-chroma_map = {"low": 1, "mid": 2, "high": 3}
-value_map = {"low": 1, "mid": 2, "high": 3}
-
-
-def analyze(products_list, weight=1):
-    tone_score, chroma_score, value_score = 0, 0, 0
+def analyze(product_list, weight=1):
+    tone_score = 0
+    chroma_score = 0
     count = 0
 
-    for p in products_list:
-        if p in products:
+    for p in product_list:
+        if p and p in products:
             data = products[p]
-            tone_score += tone_map[data["tone"]] * weight
-            chroma_score += chroma_map[data["chroma"]] * weight
-            value_score += value_map[data["value"]] * weight
+            tone_score += (1 if data["tone"] == "warm" else -1) * weight
+            chroma_score += data["chroma"] * weight
             count += weight
 
     if count == 0:
-        return 0, 0, 0
+        return 0, 0
 
-    return tone_score / count, chroma_score / count, value_score / count
+    return tone_score / count, chroma_score / count
 
 
-def determine_personal_color(tone, chroma):
-    if tone > 0:
-        if chroma >= 2:
-            return "봄 웜톤"
-        else:
-            return "가을 웜톤"
+def determine_pc(tone, chroma):
+    if tone >= 0:
+        return "봄 웜톤" if chroma >= 2 else "가을 웜톤"
     else:
-        if chroma >= 2:
-            return "겨울 쿨톤"
-        else:
-            return "여름 쿨톤"
-
-
-def recommend_products(tone):
-    result = []
-    for name, data in products.items():
-        if data["status"] == "판매중" and data["tone"] == tone:
-            result.append(name)
-    return result[:3]
+        return "겨울 쿨톤" if chroma >= 2 else "여름 쿨톤"
 
 
 # -------------------------
-# 웹 UI
+# 추천 로직
+# -------------------------
+def recommend_set(tone_type):
+    lips = []
+    blushers = []
+
+    for name, data in products.items():
+        if data["status"] != "판매중":
+            continue
+        if data["tone"] == tone_type:
+            if data["category"] == "lip":
+                lips.append(name)
+            elif data["category"] == "blusher":
+                blushers.append(name)
+
+    return lips[:3], blushers[:3]
+
+
+# -------------------------
+# UI
 # -------------------------
 HTML = """
 <h2>퍼스널 컬러 진단 (제품 기반)</h2>
 
 <form method="post">
-<h3>잘 맞았던 제품 (3개)</h3>
-<input name="good1"><br>
-<input name="good2"><br>
-<input name="good3"><br>
+
+<h3>잘 맞았던 제품</h3>
+<select name="good1"><option value="">선택</option>{% for p in products %}<option>{{p}}</option>{% endfor %}</select><br>
+<select name="good2"><option value="">선택</option>{% for p in products %}<option>{{p}}</option>{% endfor %}</select><br>
+<select name="good3"><option value="">선택</option>{% for p in products %}<option>{{p}}</option>{% endfor %}</select><br>
 
 <h3>안 맞았던 제품 (선택)</h3>
-<input name="bad1"><br>
+<select name="bad1"><option value="">선택</option>{% for p in products %}<option>{{p}}</option>{% endfor %}</select><br>
 
 <h3>반응 좋았던 제품 (선택)</h3>
-<input name="best1"><br><br>
+<select name="best1"><option value="">선택</option>{% for p in products %}<option>{{p}}</option>{% endfor %}</select><br><br>
 
 <button type="submit">분석하기</button>
 </form>
 
 {% if result %}
 <hr>
-<h2>결과: {{ result }}</h2>
+<h2>🎯 결과: {{ result }}</h2>
 
-<h3>추천 제품</h3>
-<ul>
-{% for r in recs %}
-<li>{{ r }}</li>
-{% endfor %}
-</ul>
+<h3>💄 립 추천</h3>
+<ul>{% for l in lips %}<li>{{l}}</li>{% endfor %}</ul>
+
+<h3>🌸 블러셔 추천 (립과 조합)</h3>
+<ul>{% for b in blushers %}<li>{{b}}</li>{% endfor %}</ul>
 {% endif %}
 """
 
-
+# -------------------------
+# 라우트
+# -------------------------
 @app.route("/", methods=["GET", "POST"])
 def home():
+    result = None
+    lips = []
+    blushers = []
+
     if request.method == "POST":
-        good = [request.form.get(f"good{i}") for i in range(1, 4)]
+        good = [request.form.get("good1"), request.form.get("good2"), request.form.get("good3")]
         bad = [request.form.get("bad1")]
         best = [request.form.get("best1")]
 
-        t1, c1, v1 = analyze(good, weight=1)
-        t2, c2, v2 = analyze(best, weight=2)
-        t3, c3, v3 = analyze(bad, weight=-1)
+        t1, c1 = analyze(good, 1)
+        t2, c2 = analyze(best, 2)
+        t3, c3 = analyze(bad, -1)
 
         tone = t1 + t2 + t3
         chroma = c1 + c2 + c3
 
-        result = determine_personal_color(tone, chroma)
-        tone_type = "warm" if tone > 0 else "cool"
+        result = determine_pc(tone, chroma)
+        tone_type = "warm" if tone >= 0 else "cool"
 
-        recs = recommend_products(tone_type)
+        lips, blushers = recommend_set(tone_type)
 
-        return render_template_string(HTML, result=result, recs=recs)
-
-    return render_template_string(HTML)
+    return render_template_string(HTML, products=products.keys(), result=result, lips=lips, blushers=blushers)
 
 
 if __name__ == "__main__":
