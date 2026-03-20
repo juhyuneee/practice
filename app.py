@@ -68,22 +68,25 @@ def recommend_products(tone_type):
 
 
 # -------------------------
-# UI
+# UI (key 추가로 충돌 방지)
 # -------------------------
 st.subheader("1️⃣ 잘 맞았던 제품 (최대 3개)")
-good = st.multiselect("선택", product_list, max_selections=3)
+good = st.multiselect("잘 맞았던 제품 선택", product_list, max_selections=3, key="good")
 
 st.subheader("2️⃣ 안 맞았던 제품 (선택)")
-bad = st.multiselect("선택", product_list, max_selections=3)
+bad = st.multiselect("안 맞았던 제품 선택", product_list, max_selections=3, key="bad")
 
 st.subheader("3️⃣ 반응 좋았던 제품 (선택)")
-best = st.multiselect("선택", product_list, max_selections=3)
+best = st.multiselect("반응 좋았던 제품 선택", product_list, max_selections=3, key="best")
 
 
+# -------------------------
+# 실행
+# -------------------------
 if st.button("🔍 퍼스널 컬러 분석"):
 
     if len(good) == 0:
-        st.warning("👉 최소 1개 이상 선택해주세요")
+        st.warning("👉 최소 1개 이상의 '잘 맞았던 제품'을 선택해주세요")
     else:
         t1, c1 = analyze(good, 1)
         t2, c2 = analyze(best, 2)
@@ -107,4 +110,10 @@ if st.button("🔍 퍼스널 컬러 분석"):
         for b in blushers:
             st.write("✔️", b)
 
-        st.info(f"톤 점수: {round(tone,2)} / 채도 점수: {round(chroma,2)}")
+        st.info(f"""
+        📊 분석 결과  
+        - 톤 점수: {round(tone,2)}  
+        - 채도 점수: {round(chroma,2)}  
+
+        👉 선택한 제품들의 색감 기반으로 분석되었습니다.
+        """)
