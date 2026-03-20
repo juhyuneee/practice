@@ -1,34 +1,46 @@
 import streamlit as st
 
-st.title("퍼스널 컬러 진단 (제품 기반)")
+st.set_page_config(page_title="퍼스널 컬러 추천", layout="centered")
+
+st.title("💄 퍼스널 컬러 기반 화장품 추천")
 
 # -------------------------
-# 제품 데이터
+# 제품 데이터 (국내 구매 가능 / 단종 제외)
+# tone: warm / cool
+# chroma: 1(저채도) ~ 3(고채도)
 # -------------------------
 products = {
-    "롬앤 쥬시 래스팅 틴트 07": {"tone": "warm", "chroma": 3, "category": "lip"},
-    "롬앤 쥬시 래스팅 틴트 06": {"tone": "warm", "chroma": 2, "category": "lip"},
-    "페리페라 잉크 무드 글로이 틴트 03": {"tone": "cool", "chroma": 2, "category": "lip"},
-    "페리페라 잉크 벨벳 17": {"tone": "cool", "chroma": 3, "category": "lip"},
-    "3CE 누드피치": {"tone": "warm", "chroma": 1, "category": "blusher"},
+    # 립
+    "롬앤 쥬시 래스팅 틴트 07 쥬쥬브": {"tone": "warm", "chroma": 3, "category": "lip"},
+    "롬앤 쥬시 래스팅 틴트 06 피그피그": {"tone": "cool", "chroma": 2, "category": "lip"},
+    "페리페라 잉크 무드 글로이 틴트 03 맘찍로즈": {"tone": "cool", "chroma": 2, "category": "lip"},
+    "페리페라 잉크 벨벳 17 로즈누드": {"tone": "cool", "chroma": 3, "category": "lip"},
+
+    # 블러셔
     "롬앤 베러 댄 치크 피치칩": {"tone": "warm", "chroma": 2, "category": "blusher"},
-    "에뛰드 쿠키 블러셔 핑크": {"tone": "cool", "chroma": 3, "category": "blusher"},
+    "3CE 무드 레시피 블러셔 누드피치": {"tone": "warm", "chroma": 1, "category": "blusher"},
+    "에뛰드 러블리 쿠키 블러셔 핑크": {"tone": "cool", "chroma": 3, "category": "blusher"},
+
+    # 섀도우
+    "클리오 프로 아이 팔레트 02 브라운슈": {"tone": "warm", "chroma": 2, "category": "shadow"},
+    "롬앤 베러 댄 아이즈 드라이로즈": {"tone": "cool", "chroma": 1, "category": "shadow"},
 }
 
+product_list = list(products.keys())
+
 # -------------------------
-# 분석 함수
+# 분석 함수 (안정성 강화)
 # -------------------------
-def analyze(product_list, weight=1):
+def analyze(lst, weight):
     tone_score = 0
     chroma_score = 0
     count = 0
 
-    for p in product_list:
+    for p in lst:
         if p in products:
-            data = products[p]
-            tone_score += (1 if data["tone"] == "warm" else -1) * weight
-            chroma_score += data["chroma"] * weight
-            count += weight
+            tone_score += (1 if products[p]["tone"] == "warm" else -1) * weight
+            chroma_score += products[p]["chroma"] * weight
+            count += abs(weight)
 
     if count == 0:
         return 0, 0
@@ -36,11 +48,11 @@ def analyze(product_list, weight=1):
     return tone_score / count, chroma_score / count
 
 
-def determine_pc(tone, chroma):
+def get_result(tone, chroma):
     if tone >= 0:
-        return "봄 웜톤" if chroma >= 2 else "가을 웜톤"
+        return "봄 웜톤 🌸" if chroma >= 2 else "가을 웜톤 🍂"
     else:
-        return "겨울 쿨톤" if chroma >= 2 else "여름 쿨톤"
+        return "겨울 쿨톤 ❄️" if chroma >= 2 else "여름 쿨톤 🌊"
 
 
 def recommend(tone_type):
@@ -60,35 +72,57 @@ def recommend(tone_type):
 # -------------------------
 # UI
 # -------------------------
-product_list = list(products.keys())
+st.subheader("1️⃣ 잘 맞았던 제품 (최대 3개)")
+good = st.multiselect("선택", product_list, max_selections=3)
 
-st.subheader("잘 맞았던 제품")
-good = st.multiselect("3개 선택", product_list)
+st.subheader("2️⃣ 안 맞았던 제품 (선택)")
+bad = st.multiselect("선택", product_list, max_selections=3)
 
-st.subheader("안 맞았던 제품")
-bad = st.multiselect("선택", product_list)
+st.subheader("3️⃣ 반응 좋았던 제품 (선택)")
+best = st.multiselect("선택", product_list, max_selections=3)
 
-st.subheader("반응 좋았던 제품")
-best = st.multiselect("선택", product_list)
+# -------------------------
+# 실행 버튼
+# -------------------------
+if st.button("🔍 퍼스널 컬러 분석"):
 
-if st.button("분석하기"):
+    if len(good) == 0:
+        st.warning("👉 최소 1개 이상의 '잘 맞았던 제품'을 선택해주세요")
+    else:
+        t1, c1 = analyze(good, 1)
+        t2, c2 = analyze(best, 2)
+        t3, c3 = analyze(bad, -1)
 
-    t1, c1 = analyze(good, 1)
-    t2, c2 = analyze(best, 2)
-    t3, c3 = analyze(bad, -1)
+        tone = t1 + t2 + t3
+        chroma = c1 + c2 + c3
 
-    tone = t1 + t2 + t3
-    chroma = c1 + c2 + c3
+        result = get_result(tone, chroma)
+        tone_type = "warm" if tone >= 0 else "cool"
 
-    result = determine_pc(tone, chroma)
-    tone_type = "warm" if tone >= 0 else "cool"
+        st.success(f"🎯 당신의 퍼스널 컬러: {result}")
 
-    lips, blushers = recommend(tone_type)
+        # -------------------------
+        # 연계 추천
+        # -------------------------
+        lips, blushers = recommend(tone_type)
 
-    st.success(f"🎯 결과: {result}")
+        st.subheader("💄 추천 립")
+        for l in lips:
+            st.write("✔️", l)
 
-    st.subheader("💄 립 추천")
-    st.write(lips)
+        st.subheader("🌸 추천 블러셔 (립과 조합)")
+        for b in blushers:
+            st.write("✔️", b)
 
-    st.subheader("🌸 블러셔 추천")
-    st.write(blushers)
+        # -------------------------
+        # 추가 설명 (전문성)
+        # -------------------------
+        st.info(
+            f"""
+👉 분석 기준  
+- 따뜻함/차가움 점수: {round(tone,2)}  
+- 채도 점수: {round(chroma,2)}  
+
+👉 선택한 제품들의 색감 패턴을 기반으로 도출된 결과입니다.
+"""
+        )
